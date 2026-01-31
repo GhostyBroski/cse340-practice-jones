@@ -2,9 +2,12 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import express from 'express';
 
+// Import MVC components
+import routes from './src/controllers/routes.js';
+import { addLocalVariables } from './src/middleware/global.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 const NODE_ENV = process.env.NODE_ENV || 'production';
 const PORT = process.env.PORT || 3000;
 
@@ -20,40 +23,91 @@ app.set('views', path.join(__dirname, 'src/views'));
 
 /**
  * Global template variables middleware
- * 
- * Makes common variables available to all EJS templates without having to pass
- * them individually from each route handler
  */
+app.use(addLocalVariables);
+
 app.use((req, res, next) => {
-    // Make NODE_ENV available to all templates
-    res.locals.NODE_ENV = NODE_ENV.toLowerCase() || 'production';
-    // Continue to the next middleware or route handler
+    // Skip logging for routes that start with /. (like /.well-known/)
+    if (!req.path.startsWith('/.')) {
+        console.log(`${req.method} ${req.url}`);
+    }
+    next(); // Pass control to the next middleware or route
+});
+
+app.use((req, res, next) => {
+    const currentHour = new Date().getHours();
+    res.locals.greeting = currentHour < 12 ? 'Good Morning' : currentHour < 18 ? 'Good Afternoon' : 'Good Evening';
+    next();
+});
+
+app.use((req, res, next) => {
+    const themes = ['blue-theme', 'green-theme', 'red-theme'];
+    const randomTheme = themes[Math.floor(Math.random() * themes.length)];
+    res.locals.bodyClass = randomTheme;
+    next();
+});
+
+// Global middleware to share query parameters with templates
+app.use((req, res, next) => {
+    // Make req.query available to all templates for debugging and conditional rendering
+    res.locals.queryParams = req.query || {};
+
     next();
 });
 
 /**
  * Routes
  */
-app.get('/', (req, res) => {
-    const links = { homepage: '/', about: '/about', products: '/products' };
-    const title = 'Welcome Home';
-    res.render('home', { title, links });
+app.use('/', routes);
+
+app.use((req, res, next) => {
+    const err = new Error('Page Not Found');
+    err.status = 404;
+    next(err);
 });
-app.get('/about', (req, res) => {
-    const links = { homepage: '/', about: '/about', products: '/products' };
-    const title = 'About Me';
-    res.render('about', { title, links });
-});
-app.get('/products', (req, res) => {
-    const links = { homepage: '/', about: '/about', products: '/products' };
-    const title = 'Our Products';
-    res.render('products', { title, links });
-});
-app.get('/student', (req, res) => {
-    const student = { name: 'Ash Jones', id: 920634983, email: 'jon22057@byui.edu', address: '156 W 4th S Rexburg, Idaho 83440' };
-    const links = { homepage: '/', about: '/about', products: '/products' };
-    const title = 'Student Info';
-    res.render('student', { student, title, links });
+
+app.use((err, req, res, next) => {
+    // Prevent infinite loops, if a response has already been sent, do nothing
+    if (res.headersSent || res.finished) {
+        return next(err);
+    }
+
+    // Determine status and template
+    const status = err.status || 500;
+    const timestamp = new Date().toLocaleString();
+    const method = req.method;
+    const url = req.originalUrl;
+    const agent = req.get('User-Agent');
+
+    console.error(`
+        --- ERROR REPORT [${timestamp}] ---
+        Status:  ${status}
+        Message: ${err.message}
+        Route:   ${method} ${url}
+        Agent:   ${agent}
+        Stack:   ${err.stack}
+        -----------------------------------
+    `);
+
+    const template = status === 404 ? '404' : '500';
+    const isProd = res.locals.NODE_ENV === 'production';
+    // Prepare data for the template
+    const context = {
+        title: status === 404 ? 'Page Not Found' : `Error ${status}`,
+        message: (isProd && status >= 500) ? 'An unexpected server error occurred.' : err.message,
+        error: isProd ? null : err,
+        stack: isProd ? null : err.stack,
+        NODE_ENV // Our WebSocket check needs this and its convenient to pass along
+    };
+    // Render the appropriate error template with fallback
+    try {
+        res.status(status).render(`errors/${template}`, context);
+    } catch (renderErr) {
+        // If rendering fails, send a simple error page instead
+        if (!res.headersSent) {
+            res.status(status).send(`<h1>Error ${status}</h1><p>An error occurred.</p>`);
+        }
+    }
 });
 
 if (NODE_ENV.includes('dev')) {
