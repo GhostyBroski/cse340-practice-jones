@@ -15,6 +15,32 @@ const getCurrentGreeting = () => {
     return 'Good Evening!';
 };
 
+const setHeadAssetsFunctionality = (res) => {
+    res.locals.styles = [];
+    res.locals.scripts = [];
+    res.addStyle = (css, priority = 0) => {
+        res.locals.styles.push({ content: css, priority });
+    };
+    res.addScript = (js, priority = 0) => {
+        res.locals.scripts.push({ content: js, priority });
+    };
+    // These functions will be available in EJS templates
+    res.locals.renderStyles = () => {
+        return res.locals.styles
+            // Sort by priority: higher numbers load first
+            .sort((a, b) => b.priority - a.priority)
+            .map(item => item.content)
+            .join('\n');
+    };
+    res.locals.renderScripts = () => {
+        return res.locals.scripts
+            // Sort by priority: higher numbers load first
+            .sort((a, b) => b.priority - a.priority)
+            .map(item => item.content)
+            .join('\n');
+    };
+};
+
 /**
  * Middleware to add local variables to res.locals for use in all templates.
  * Templates can access these values but are not required to use them.
@@ -38,13 +64,17 @@ const addLocalVariables = (req, res, next) => {
         catalog: "/catalog",
         student: "/student",
         faculty: "/faculty",
-        demo: "/demo"
+        demo: "/demo",
+        contact: "/contact",
+        contactResponses: "/contact/responses"
     };
 
     // Randomly assign a theme class to the body
     const themes = ['blue-theme', 'green-theme', 'red-theme'];
     const randomTheme = themes[Math.floor(Math.random() * themes.length)];
     res.locals.bodyClass = randomTheme;
+
+    setHeadAssetsFunctionality(res)
 
     // Continue to the next middleware or route handler
     next();
