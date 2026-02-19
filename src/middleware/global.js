@@ -66,8 +66,18 @@ const addLocalVariables = (req, res, next) => {
         faculty: "/faculty",
         demo: "/demo",
         contact: "/contact",
-        contactResponses: "/contact/responses"
+        contactResponses: "/contact/responses",
+        registration: "/register",
+        registrationList: "/register/list",
+        login: "/login",
+        logout: "/logout",
+        dashboard: "/dashboard"
     };
+
+    res.locals.isLoggedIn = false;
+    if (req.session && req.session.user) {
+        res.locals.isLoggedIn = true;
+    }
 
     // Randomly assign a theme class to the body
     const themes = ['blue-theme', 'green-theme', 'red-theme'];
