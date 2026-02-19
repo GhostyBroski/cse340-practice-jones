@@ -62,8 +62,9 @@ router.use('/contact', contactRoutes);
 router.use('/register', registrationRoutes);
 
 router.use('/login', loginRoutes);
+router.get('/dashboard', requireLogin, showDashboard);
 
 router.get('/logout', processLogout);
-router.get('/dashboard', requireLogin, showDashboard);
+
 
 export default router;
