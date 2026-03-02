@@ -16,12 +16,16 @@ import { caCert } from './src/models/db.js';
 
 import { startSessionCleanup } from './src/utils/session-cleanup.js';
 
+import flash from './src/middleware/flash.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const NODE_ENV = process.env.NODE_ENV || 'production';
 const PORT = process.env.PORT || 3000;
 
 const app = express();
+
+app.set('trust proxy', 1); // Trust first proxy for secure cookies behind a reverse proxy
 
 // Initialize PostgreSQL session store
 const pgSession = connectPgSimple(session);
@@ -68,6 +72,8 @@ app.use(express.json());
  * Global template variables middleware
  */
 app.use(addLocalVariables);
+
+app.use(flash);
 
 app.use((req, res, next) => {
     // Skip logging for routes that start with /. (like /.well-known/)
